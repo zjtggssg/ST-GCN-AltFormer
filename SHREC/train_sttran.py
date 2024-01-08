@@ -75,18 +75,10 @@ def init_model(data_cfg):
     l = [('labeling_mode', 'spatial')]
     graph_args = dict(l)
     address = 'graph.SHRE'
-    model = ST_GCN_AltFormer(channel=3, num_class=class_num, window_size=300, num_point=22, attention=True,
-                      only_attention=True,
-                      tcn_attention=False, all_layers=False, only_temporal_attention=True, attention_3=False,
-                      relative=False,
-                      double_channel=True,
-                      drop_connect=True, concat_original=True, dv=0.25, dk=0.25, Nh=8, dim_block1=10, dim_block2=30,
-                      dim_block3=75,
-                      data_normalization=True, visualization=False, skip_conn=True, adjacency=False,
-                      kernel_temporal=9, bn_flag=True, weight_matrix=2, more_channels=False, n=4, device=output_device,
-                      graph=address,
-                      graph_args=graph_args
-                      )
+    model = ST_GCN_AltFormer(channel=3, backbone_in_c=128, num_class=class_num, style='ST',
+                             graph=address,
+                             graph_args=graph_args
+                             )
 
     model = torch.nn.DataParallel(model).cuda()
 
