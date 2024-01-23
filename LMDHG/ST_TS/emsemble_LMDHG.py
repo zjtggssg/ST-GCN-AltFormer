@@ -8,8 +8,9 @@ from sklearn.metrics import confusion_matrix
 import numpy as np
 
 from data_process.LMDHG_Hand import LMDHG_Hand_Dataset
+from LMDHG.LMDHG_dataset import get_LMDHG_dataset
 
-from model.ST_Vit.ST_GCN_Trans import ST_GCN_Trans
+from model.AltFormer.ST_GCN_AltFormer import ST_GCN_AltFormer
 
 parser = argparse.ArgumentParser()
 
@@ -42,22 +43,14 @@ def init_model_st():
     l = [('labeling_mode', 'spatial')]
     graph_args = dict(l)
     address = 'graph.LMDHG'
-    model = ST_GCN_Trans(channel=3, num_class=class_num, window_size=300, num_point=46, attention=True,
-                         only_attention=True,
-                         tcn_attention=False, all_layers=False, only_temporal_attention=True, attention_3=False,
-                         relative=False,
-                         double_channel=True,
-                         drop_connect=True, concat_original=True, dv=0.25, dk=0.25, Nh=8, dim_block1=10, dim_block2=30,
-                         dim_block3=75,
-                         data_normalization=True, visualization=False, skip_conn=True, adjacency=False,
-                         kernel_temporal=9, bn_flag=True, weight_matrix=2, more_channels=False, n=4,
-                         device=output_device,
-                         graph=address,
-                         graph_args=graph_args
-                         )
+    model = ST_GCN_AltFormer(channel=3, backbone_in_c=128, num_frame=180, num_joints=46, num_class=class_num,
+                             style='ST',
+                             graph=address,
+                             graph_args=graph_args
+                             )
 
     model = torch.nn.DataParallel(model).cuda()
-    model_path = '/home/zjt/Desktop/ST-GCN-AltFormer/LMDHG/weight/STVIT/STVIT.pth'
+    model_path = '/data/zjt/AltFormer_code/LMDHG/weight/st_LMDHG.pth'
     state_dict = torch.load(model_path)
 
     model.load_state_dict(state_dict)
@@ -66,7 +59,27 @@ def init_model_st():
     return model
 
 
+def init_model_ts():
+    class_num = 14
 
+    output_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    l = [('labeling_mode', 'spatial')]
+    graph_args = dict(l)
+    address = 'graph.LMDHG'
+    model = ST_GCN_AltFormer(channel=3, backbone_in_c=128, num_frame=180, num_joints=46, num_class=class_num,
+                             style='TS',
+                             graph=address,
+                             graph_args=graph_args
+                             )
+
+    model = torch.nn.DataParallel(model).cuda()
+    model_path = '/data/zjt/AltFormer_code/LMDHG/weight/ts_LMDHG.pth'
+    state_dict = torch.load(model_path)
+
+    model.load_state_dict(state_dict)
+
+    model.eval()
+    return model
 
 # def init_model_motion(data_cfg):
 #     if data_cfg == 0:
@@ -140,7 +153,7 @@ def model_forward(sample_batched, model):
     data = sample_batched["skeleton"].float()
     # data = data.unsqueeze(0)
     # print(data.shape)
-    score= model(data)
+    score = model(data)
 
     return score
 
@@ -230,13 +243,13 @@ def plot_confusion(predicted_labels,true_labels,style):
     plt.savefig("/data/zjt/handgesture/pic/{}_LMDHG_confusion_matrix.png".format(style))
 
 
-def emsemble_acc(st,label,motion = None,bone = None):
+def emsemble_acc(st,ts,label,motion = None,bone = None):
 
-    a = 0.0
-    combiend =  st
+    a = 0.8
+    combiend = a* st +(1-a) * ts
     # combiend = ts
     acc = get_acc(combiend ,label)
-    plot_confusion(combiend,true_labels,style = 'ST_VIT')
+    # plot_confusion(combiend,true_labels,style = 'ST_TS')
     # val_get_pic(combiend,label,acc,style = 'st_ts')
     get_wrong(combiend,label,pred = 13)
     # findwrong(142)
@@ -256,7 +269,7 @@ if __name__ == '__main__':
     bone_list = []
 
     # 迭代测试数据集并获取每个模型的预测结果
-    pd = 2
+    pd = 3
 
     if pd == 1:
         model_st = init_model_st()
@@ -277,10 +290,22 @@ if __name__ == '__main__':
         st_list = st_list.reshape(355, 14)
         del model_st, pred
         print("st succeed!")
-        np.save('/data/zjt/LMDHG/ST_VIT/st.npy',st_list)
+        np.save('/data/zjt/LMDHG/combined/st.npy',st_list)
 
 
-
+    elif pd == 2:
+        model_ts = init_model_ts()
+        test_loader = init_data_loader()
+        for data in test_loader:
+            with torch.no_grad():
+                pred2= model_forward(data, model_ts)
+                pred2 = pred2.cpu().numpy()
+                ts_list.append(pred2)
+        ts_list = np.concatenate(ts_list, axis=0)
+        ts_list = ts_list.reshape(355, 14)
+        del model_ts, pred2
+        print("ts succeed!")
+        np.save('/data/zjt/LMDHG/combined/ts.npy',ts_list)
 
     #motion
     # elif pd == 3:
@@ -314,9 +339,10 @@ if __name__ == '__main__':
 
 
     else:
-        st_list = np.load('/data/zjt/LMDHG/ST_VIT/st.npy')
+        st_list = np.load('/data/zjt/LMDHG/combined/st.npy')
         print(st_list.shape)
-
+        ts_list = np.load('/data/zjt/LMDHG/combined/ts.npy')
+        print(ts_list.shape)
         # motion_list = np.load('/data/zjt/HandGestureDataset_SHREC2017/gesture/combined/motion.npy')
         # print(motion_list.shape)
         # bone_list = np.load('/data/zjt/HandGestureDataset_SHREC2017/gesture/combined/bone.npy')
@@ -332,11 +358,11 @@ if __name__ == '__main__':
 
 
         acc_st = get_acc(st_list, true_labels)
-
+        acc_ts = get_acc(ts_list, true_labels)
         # acc_motion = get_acc(motion_list, true_labels)
         # acc_bone = get_acc(bone_list, true_labels)
         print("st acc:", acc_st)
-
+        print("ts acc:", acc_ts)
         # print("st acc:", acc_motion)
         # print("ts acc:", acc_bone)
 
@@ -345,6 +371,6 @@ if __name__ == '__main__':
         # plot_confusion(st_list, true_labels, style='st')
         # plot_confusion(ts_list, true_labels, style='ts')
         # 计算集成结果的准确率
-        accuracy = emsemble_acc(st_list, true_labels,motion_list,bone_list)
+        accuracy = emsemble_acc(st_list, ts_list, true_labels,motion_list,bone_list)
 
         print("Ensemble acc:", accuracy)

@@ -9,10 +9,10 @@ import os
 
 from numpy.distutils.fcompiler import str2bool
 
-from LMDHG.LMDHG_Hand import LMDHG_Hand_Dataset
+from data_process.LMDHG_Hand import LMDHG_Hand_Dataset
 from LMDHG.LMDHG_dataset import get_LMDHG_dataset
-from model.ST_GCN_AltFormer import ST_GCN_AltFormer
-from model.ST_GCN_Trans import ST_GCN_Trans
+from model.AltFormer.ST_GCN_AltFormer import ST_GCN_AltFormer
+from model.ST_Vit.ST_GCN_Trans import ST_GCN_Trans
 
 parser = argparse.ArgumentParser()
 

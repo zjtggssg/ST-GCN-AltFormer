@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 
 import torch.optim as optim
@@ -9,19 +8,15 @@ import os
 
 from numpy.distutils.fcompiler import str2bool
 
-from SHREC.dataset_node import split_train_test
-
 from model.AltFormer.ST_GCN_AltFormer import ST_GCN_AltFormer
 
-
+from SHREC.dataset_node import *
 
 from data_process.Hand_Dataset import Hand_Dataset
 
-
-
 parser = argparse.ArgumentParser()
 
-parser.add_argument("-b", "--batch_size", type=int, default=32)  # 16
+parser.add_argument("-b", "--batch_size", type=int, default=16)  # 16
 parser.add_argument("-lr", "--learning_rate", type=float, default=1e-3)
 parser.add_argument('--cuda', default=True, help='enables cuda')
 parser.add_argument('-j', '--workers', default=8, type=int, metavar='N',
@@ -32,7 +27,7 @@ parser.add_argument('--epochs', default=10000, type=int, metavar='N',
 parser.add_argument('--patiences', default=1000, type=int,
                     help='number of epochs to tolerate the no improvement of val_loss')  # 1000
 
-parser.add_argument('--data_cfg', type=int, default=0,
+parser.add_argument('--data_cfg', type=int, default=1,
                     help='0 for 14 class, 1 for 28')
 
 parser.add_argument(
@@ -45,10 +40,9 @@ parser.add_argument('--dp_rate', type=float, default=0.2,
 def init_data_loader(data_cfg):
     train_data, test_data = split_train_test(data_cfg)
 
-    train_dataset = Hand_Dataset(train_data, use_data_aug=True, time_len=180, expand=2)
+    train_dataset = Hand_Dataset(train_data, use_data_aug=True, time_len=180,expand=0)
 
-
-    test_dataset = Hand_Dataset(test_data, use_data_aug=False, time_len=180, expand=2)
+    test_dataset = Hand_Dataset(test_data, use_data_aug=False, time_len=180,expand=0)
 
     print("train data num: ", len(train_dataset))
     print("test data num: ", len(test_dataset))
@@ -79,18 +73,23 @@ def init_model(data_cfg):
     l = [('labeling_mode', 'spatial')]
     graph_args = dict(l)
     address = 'graph.SHRE'
-    model = ST_GCN_AltFormer(channel=3, num_class=class_num, window_size=300, num_point=22, attention=True,
-                      only_attention=True,
-                      tcn_attention=False, all_layers=False, only_temporal_attention=True, attention_3=False,
-                      relative=False,
-                      double_channel=True,
-                      drop_connect=True, concat_original=True, dv=0.25, dk=0.25, Nh=8, dim_block1=10, dim_block2=30,
-                      dim_block3=75,
-                      data_normalization=True, visualization=False, skip_conn=True, adjacency=False,
-                      kernel_temporal=9, bn_flag=True, weight_matrix=2, more_channels=False, n=4, device=output_device,
-                      graph=address,
-                      graph_args=graph_args
-                      )
+    # model = ST_TR_new(channel=3, num_class=class_num, window_size=300, num_point=22, attention=True,
+    #                   only_attention=True,
+    #                   tcn_attention=False, all_layers=False, only_temporal_attention=True, attention_3=False,
+    #                   relative=False,
+    #                   double_channel=True,
+    #                   drop_connect=True, concat_original=True, dv=0.25, dk=0.25, Nh=8, dim_block1=10, dim_block2=30,
+    #                   dim_block3=75,
+    #                   data_normalization=True, visualization=False, skip_conn=True, adjacency=False,
+    #                   kernel_temporal=9, bn_flag=True, weight_matrix=2, more_channels=False, n=4, device=output_device,
+    #                   graph=address,
+    #                   graph_args=graph_args
+    #                   )
+    model = ST_GCN_AltFormer(channel=3, backbone_in_c=128, num_frame = 180 ,num_joints = 22,num_class=class_num,
+                             style='TS',
+                             graph=address,
+                             graph_args=graph_args
+                             )
 
     model = torch.nn.DataParallel(model).cuda()
 
@@ -99,13 +98,12 @@ def init_model(data_cfg):
 
 def model_foreward(sample_batched, model, criterion):
     data = sample_batched["skeleton"].float()
-
     label = sample_batched["label"]
     label = label.type(torch.LongTensor)
     label = label.cuda()
     label = torch.autograd.Variable(label, requires_grad=False)
 
-    score,x_st,x_ts = model(data)
+    score = model(data)
 
     loss = criterion(score, label)
 
@@ -146,7 +144,7 @@ if __name__ == "__main__":
 
     # fold for saving trained model...
     # change this path to the fold where you want to save your pre-trained model
-    model_fold = "/data/zjt/handgesture/ST/SHREC_bone_dp-{}_lr-{}_dc-{}/".format(args.dp_rate,
+    model_fold = "/data/zjt/handgesture/TS/SHREC_dp-{}_lr-{}_dc-{}/".format(args.dp_rate,
                                                      args.learning_rate,
                                                       args.data_cfg)
     try:
@@ -159,16 +157,9 @@ if __name__ == "__main__":
     # .........inital model
     print("\ninit model.............")
     model = init_model(args.data_cfg)
-    # model_solver = optim.Adam(model.parameters(), lr=2e-4)
-    # model_solver = optim.SGD(
-    #     model.parameters(),
-    #     lr=0.01,
-    #     momentum=0.9,
-    #     nesterov=args.nesterov,
-    #     weight_decay=0.0005)
+
     model_solver = optim.AdamW(model.parameters(), lr=2e-4, weight_decay=0.1)
 
-    # model_solver = adamod.AdaMod(model.parameters(), lr=0.01, beta3=0.999)
 
     # ........set loss
     criterion = torch.nn.CrossEntropyLoss()

@@ -9,15 +9,10 @@ import os
 
 from numpy.distutils.fcompiler import str2bool
 
-from SHREC.dataset_node import split_train_test
+from data_process.LMDHG_Hand import LMDHG_Hand_Dataset
+from LMDHG.LMDHG_dataset import get_LMDHG_dataset
 
-from model.AltFormer.ST_GCN_AltFormer import ST_GCN_AltFormer
-
-
-
-from data_process.Hand_Dataset import Hand_Dataset
-
-
+from model.ST_TR.ST_TR_new import ST_TR_new
 
 parser = argparse.ArgumentParser()
 
@@ -32,8 +27,8 @@ parser.add_argument('--epochs', default=10000, type=int, metavar='N',
 parser.add_argument('--patiences', default=1000, type=int,
                     help='number of epochs to tolerate the no improvement of val_loss')  # 1000
 
-parser.add_argument('--data_cfg', type=int, default=0,
-                    help='0 for 14 class, 1 for 28')
+# parser.add_argument('--data_cfg', type=int, default=0,
+#                     help='0 for 14 class, 1 for 28')
 
 parser.add_argument(
     '--nesterov', type=str2bool, default=True, help='use nesterov or not')
@@ -42,13 +37,12 @@ parser.add_argument('--dp_rate', type=float, default=0.2,
                     help='dropout rate')  # 1000
 
 
-def init_data_loader(data_cfg):
-    train_data, test_data = split_train_test(data_cfg)
+def init_data_loader():
+    train_data, test_data = get_LMDHG_dataset()
 
-    train_dataset = Hand_Dataset(train_data, use_data_aug=True, time_len=180, expand=2)
+    train_dataset = LMDHG_Hand_Dataset(train_data, use_data_aug=True, time_len=180)
 
-
-    test_dataset = Hand_Dataset(test_data, use_data_aug=False, time_len=180, expand=2)
+    test_dataset = LMDHG_Hand_Dataset(test_data, use_data_aug=False, time_len=180)
 
     print("train data num: ", len(train_dataset))
     print("test data num: ", len(test_dataset))
@@ -69,17 +63,14 @@ def init_data_loader(data_cfg):
     return train_loader, val_loader
 
 
-def init_model(data_cfg):
-    if data_cfg == 0:
-        class_num = 14
-    elif data_cfg == 1:
-        class_num = 28
+def init_model():
 
+    class_num = 14
     output_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     l = [('labeling_mode', 'spatial')]
     graph_args = dict(l)
-    address = 'graph.SHRE'
-    model = ST_GCN_AltFormer(channel=3, num_class=class_num, window_size=300, num_point=22, attention=True,
+    address = 'graph.LMDHG'
+    model = ST_TR_new(channel=3, num_class=class_num, window_size=300, num_point=46, attention=True,
                       only_attention=True,
                       tcn_attention=False, all_layers=False, only_temporal_attention=True, attention_3=False,
                       relative=False,
@@ -99,13 +90,12 @@ def init_model(data_cfg):
 
 def model_foreward(sample_batched, model, criterion):
     data = sample_batched["skeleton"].float()
-
     label = sample_batched["label"]
     label = label.type(torch.LongTensor)
     label = label.cuda()
     label = torch.autograd.Variable(label, requires_grad=False)
 
-    score,x_st,x_ts = model(data)
+    score = model(data)
 
     loss = criterion(score, label)
 
@@ -122,16 +112,21 @@ def get_acc(score, labels):
 
 
 # def val_get_pic(score, labels,val_cc):
-#     # labels_name = ['Grab', 'Tap', 'Expand', 'Pinch', 'Rotation CW', 'Rotation CCW', 'Swipe Right','Swipe Left','Swipe Up','Swipe Down','Swipe X','Swipe +','Swipe V','Shake']
-#     labels_name = ['Grab(1)', 'Grab(2)','Tap(1)','Tap(2)','Expand(1)','Expand(2)', 'Pinch(1)', 'Pinch(2)','Rotation CW(1)', 'Rotation CW(2)','Rotation CCW(1)', 'Rotation CCW(2)','Swipe Right(1)','Swipe Right(2)','Swipe Left(1)','Swipe Left(2)',
-#                    'Swipe Up(1)', 'Swipe Up(2)','Swipe Down(1)', 'Swipe Down(2)','Swipe X(1)','Swipe X(2)', 'Swipe +(1)','Swipe +(2)','Swipe V(1)', 'Swipe V(2)', 'Shake(1)','Shake(2)']
+#
+#     labels_name = ['Catch', 'Catch With Two Hands','Draw C','Scroll','Draw Line','Rotate', 'Point To',
+#                    'Point To With Two Hands','Rest', 'Shake','Shake Down',
+#                    'Shake With Two Hands','Slice','Zoom'
+#                    ]
 #     drawconfusionmatrix = DrawConfusionMatrix(labels_name=labels_name,val_cc = val_cc)
 #     score = score.cpu().data.numpy()
 #     outputs = np.argmax(score, axis=1)
+#     # print("shape:",outputs.shape)
+#     # print("outputs:",outputs)
+#     # print(type(labels))
+#     labels = labels.type(torch.IntTensor)
 #     drawconfusionmatrix.update(outputs, labels)
 #     drawconfusionmatrix.drawMatrix()  # 根据所有predict和label，画出混淆矩阵
 #     # confusion_mat = drawconfusionmatrix.getMatrix()
-#
 #     print("succeed!")
 
 
@@ -146,29 +141,26 @@ if __name__ == "__main__":
 
     # fold for saving trained model...
     # change this path to the fold where you want to save your pre-trained model
-    model_fold = "/data/zjt/handgesture/ST/SHREC_bone_dp-{}_lr-{}_dc-{}/".format(args.dp_rate,
-                                                     args.learning_rate,
-                                                      args.data_cfg)
+    model_fold = "/data/zjt/LMDHG/STR/LMDHG_dp-{}_lr-{}/".format(args.dp_rate,
+                                                            args.learning_rate)
     try:
         os.mkdir(model_fold)
     except:
         pass
 
-    train_loader, val_loader = init_data_loader(args.data_cfg)
+    train_loader, val_loader = init_data_loader()
 
     # .........inital model
     print("\ninit model.............")
-    model = init_model(args.data_cfg)
-    # model_solver = optim.Adam(model.parameters(), lr=2e-4)
-    # model_solver = optim.SGD(
-    #     model.parameters(),
-    #     lr=0.01,
-    #     momentum=0.9,
-    #     nesterov=args.nesterov,
-    #     weight_decay=0.0005)
-    model_solver = optim.AdamW(model.parameters(), lr=2e-4, weight_decay=0.1)
+    model = init_model()
 
-    # model_solver = adamod.AdaMod(model.parameters(), lr=0.01, beta3=0.999)
+    # model_solver = optim.AdamW(model.parameters(), lr=2e-4, weight_decay=0.1)
+    model_solver = optim.SGD(
+        model.parameters(),
+        lr=0.01,
+        momentum=0.9,
+        nesterov=args.nesterov,
+        weight_decay=0.0005)
 
     # ........set loss
     criterion = torch.nn.CrossEntropyLoss()
@@ -250,7 +242,7 @@ if __name__ == "__main__":
             if val_cc > max_acc:
                 max_acc = val_cc
                 no_improve_epoch = 0
-                # val_get_pic(score_list, label_list, val_cc)
+
                 val_cc = round(val_cc, 10)
 
                 torch.save(model.state_dict(),

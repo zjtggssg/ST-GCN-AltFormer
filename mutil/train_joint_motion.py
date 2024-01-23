@@ -11,7 +11,7 @@ from numpy.distutils.fcompiler import str2bool
 
 from SHREC.dataset_node import split_train_test
 
-from model.ST_GCN_AltFormer import ST_GCN_AltFormer
+from model.AltFormer.ST_GCN_AltFormer import ST_GCN_AltFormer
 
 
 

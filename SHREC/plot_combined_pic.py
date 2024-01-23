@@ -3,16 +3,12 @@ import argparse
 import os
 import torch.nn.functional as F
 from matplotlib import pyplot as plt
-from matplotlib.colors import BoundaryNorm
-from sklearn.metrics import confusion_matrix
-from torch import softmax
-from visualizer import get_local
 
-from SHREC.visualize_funtions import visualize_head, visualize_heads, visualiize_head_mean
+from visualizer import get_local
 
 get_local.activate() # 激活装饰器
 from SHREC.Confusion import DrawConfusionMatrix
-from model.ST_GCN_AltFormer import ST_GCN_AltFormer
+from model.AltFormer.ST_GCN_AltFormer import ST_GCN_AltFormer
 from dataset_node import *
 from data_process.Hand_Dataset import Hand_Dataset
 

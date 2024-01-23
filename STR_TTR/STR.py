@@ -186,8 +186,6 @@ class STR(nn.Module):
 
         x = x.mean(dim=1)
 
-
-
         pred = x
 
         return pred

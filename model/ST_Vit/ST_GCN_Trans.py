@@ -1,11 +1,13 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+
 import numpy as np
 
+
 from model.ST_TR.gcn_attention import gcn_unit_attention
-from model.net import import_class, Unit2D
-from model.unit_agcn import unit_agcn, conv_init
+from model.net import Unit2D, import_class
+from model.ST_Vit.trans import  ViT
+from model.unit_agcn import unit_agcn
 
 default_backbone_all_layers = [(3, 64, 1), (64, 64, 1), (64, 64, 1), (64, 64, 1), (64, 128,
                                                                                    2), (128, 128, 1),
@@ -16,39 +18,7 @@ default_backbone = [(64, 64, 1), (64, 64, 1), (64, 64, 1), (64, 128,
                     (128, 128, 1), (128, 256, 2), (256, 256, 1), (256, 256, 1)]
 
 
-class ST_TR_new(nn.Module):
-    """ Spatial temporal graph convolutional networks
-                        for skeleton-based action recognition.
-
-    Input shape:
-        Input shape should be (N, C, T, V, M)
-        where N is the number of samples,
-              C is the number of input channels,
-              T is the length of the sequence,
-              V is the number of joints or graph nodes,
-          and M is the number of people.
-
-    Arguments:
-        About shape:
-            channel (int): Number of channels in the input data
-            num_class (int): Number of classes for classification
-            window_size (int): Length of input sequence
-            num_point (int): Number of joints or graph nodes
-            num_person (int): Number of people
-        About net:
-            use_data_bn: If true, the data will first input to a batch normalization layer
-            backbone_config: The structure of backbone networks
-        About graph convolution:
-            graph: The graph of skeleton, represtented by a adjacency matrix
-            graph_args: The arguments of graph
-            mask_learning: If true, use mask matrixes to reweight the adjacency matrixes
-            use_local_bn: If true, each node in the graph have specific parameters of batch normalzation layer
-        About temporal convolution:
-            multiscale: If true, use multi-scale temporal convolution
-            temporal_kernel_size: The kernel size of temporal convolution
-            dropout: The drop out rate of the dropout layer in front of each temporal convolution layer
-
-    """
+class ST_GCN_Trans(nn.Module):
 
     def __init__(self,
                  channel,
@@ -92,15 +62,13 @@ class ST_TR_new(nn.Module):
                  temporal_kernel_size=9,
                  dropout=0.5,
                  agcn=True):
-        super(ST_TR_new, self).__init__()
+        super(ST_GCN_Trans, self).__init__()
         if graph is None:
             raise ValueError()
         else:
+            # print(graph)
             Graph = import_class(graph)
             self.graph = Graph(**graph_args)
-            # self.A = torch.from_numpy(self.graph.A).float().cuda(0)
-            # self.A = torch.from_numpy(self.graph.A).float()
-            # self.A = self.graph.A
             self.A = torch.from_numpy(self.graph.A.astype(np.float32))
 
         self.num_class = num_class
@@ -191,10 +159,10 @@ class ST_TR_new(nn.Module):
         ])
         if self.double_channel:
             backbone_in_c = backbone_config[0][0] * 2
-            backbone_out_c = backbone_config[-1][1] * 2
+            # backbone_out_c = backbone_config[-1][1] * 2
         else:
             backbone_in_c = backbone_config[0][0]
-            backbone_out_c = backbone_config[-1][1]
+            # backbone_out_c = backbone_config[-1][1]
         backbone_out_t = window_size
         backbone = []
         for i, (in_c, out_c, stride) in enumerate(backbone_config):
@@ -212,75 +180,55 @@ class ST_TR_new(nn.Module):
             else:
                 backbone_out_t = backbone_out_t // stride + 1
         self.backbone = nn.ModuleList(backbone)
-        print("self.backbone: ", self.backbone)
+        # print("self.backbone: ", self.backbone)
         for i in range(0, len(backbone)):
             pytorch_total_params = sum(p.numel() for p in self.backbone[i].parameters() if p.requires_grad)
-            print(pytorch_total_params)
+            # print(pytorch_total_params)
 
-        # head
 
-        if not all_layers:
-            if not agcn:
-                self.gcn0 = unit_agcn(
-                    channel,
-                    backbone_in_c,
-                    self.A,
-                    mask_learning=mask_learning,
-                    use_local_bn=use_local_bn)
-            else:
-                self.gcn0 = unit_agcn(
-                    channel,
-                    backbone_in_c,
-                    self.A,
-                    mask_learning=mask_learning,
-                    use_local_bn=use_local_bn)
+        ##mid
 
-            self.tcn0 = Unit2D(backbone_in_c, backbone_in_c, kernel_size=9)
+        self.gcn0 = unit_agcn(
+            channel,
+            backbone_in_c,
+            self.A,
+            mask_learning=mask_learning,
+            use_local_bn=use_local_bn)
 
-        # tail
-        self.person_bn = nn.BatchNorm1d(backbone_out_c)
-        self.gap_size = backbone_out_t
-        self.fcn = nn.Conv1d(backbone_out_c, num_class, kernel_size=1)
-        conv_init(self.fcn)
+        self.tcn0 = Unit2D(backbone_in_c, backbone_in_c, kernel_size=9)
+
+        self. v = ViT(
+            time_len = 180, joint = 22, p1 = 20, p2 = 2,
+            num_classes = self.num_class,
+            dim = 512,
+            depth = 6,
+            heads = 8,
+            mlp_dim = 512,
+            dropout = 0.1,
+            emb_dropout = 0.0
+     )
+
+
 
     def forward(self, x):
-        x = x.permute(0, 3, 1, 2)
-        N, C, T, V = x.size()
+        # input shape: [batch_size, time_len, joint_num, 3]
+        x = x.permute(0,3,1,2)
 
-        x_coord = x
+        N, C, T, V= x.size()  ##Batch  channel  frame  joint
 
         x = x.permute(0, 1, 2, 3).contiguous().view(N, C, T, V)
-        # print(x.shape)  #8 3 180 22
+
         if not self.all_layers:
             x = self.gcn0(x)
-            # print(x.shape)
             x = self.tcn0(x)
 
-        for i, m in enumerate(self.backbone):
-            if i == 3 and self.concat_original:
-                x = m(torch.cat((x, x_coord), dim=1))
-            else:
-                x = m(x)
-
-
-        b, c, f, p = x.shape
-        # V pooling
-        x = F.avg_pool2d(x, kernel_size=(1, p))
-
-        # M pooling
-        c = x.size(1)
-        t = x.size(2)
-        x = x.view(b, c, t)
-
-        # T pooling
-        x = F.avg_pool1d(x, kernel_size=int(x.size()[2]))
-        # 8 180 1
-        # C fcn
-        x = self.fcn(x)
-        x = F.avg_pool1d(x, x.size()[2:])
-        pred = x.view(b, self.num_class)
+        #
+        pred = self.v(x)
+        # pred = x_st
+        # pred = x_ts
 
         return pred
+
 
 class TCN_GCN_unit(nn.Module):
     def __init__(self,

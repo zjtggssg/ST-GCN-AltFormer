@@ -1,11 +1,10 @@
 import numpy as np
 import torch
 from fvcore.nn import FlopCountAnalysis, parameter_count_table
-from thop import profile
 from data_process.Hand_Dataset import Hand_Dataset
-from model.ST_GCN_AltFormer import ST_GCN_AltFormer
+from model.AltFormer.ST_GCN_AltFormer import ST_GCN_AltFormer
 from model.ST_GCN_Altformer_new import ST_GCN_AltFormer_new
-from model.ST_GCN_Trans import ST_GCN_Trans
+from model.ST_Vit.ST_GCN_Trans import ST_GCN_Trans
 from model.ST_TR.ST_TR_new import ST_TR_new
 
 output_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -19,15 +18,7 @@ def init_model_st_ts(data_cfg):
     l = [('labeling_mode', 'spatial')]
     graph_args = dict(l)
     address = 'graph.SHRE'
-    model = ST_GCN_AltFormer(channel=3, num_class=class_num, window_size=300, num_point=22, attention=True,
-                             only_attention=True,
-                             tcn_attention=False, all_layers=False, only_temporal_attention=True, attention_3=False,
-                             relative=False,
-                             double_channel=True,
-                             drop_connect=True, concat_original=True, dv=0.25, dk=0.25, Nh=8, dim_block1=10, dim_block2=30,
-                             dim_block3=75,
-                             data_normalization=True, visualization=False, skip_conn=True, adjacency=False,
-                             kernel_temporal=9, bn_flag=True, weight_matrix=2, more_channels=False, n=4, device=output_device,
+    model = ST_GCN_AltFormer(channel=3, backbone_in_c=128, num_frame=180, num_class=class_num, style='ST',
                              graph=address,
                              graph_args=graph_args
                              )

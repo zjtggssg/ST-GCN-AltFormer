@@ -6,13 +6,13 @@ import torch.nn.functional as F
 from matplotlib import pyplot as plt
 from matplotlib.colors import BoundaryNorm
 
-from LMDHG.LMDHG_Hand import LMDHG_Hand_Dataset
-from SHREC.visualize_funtions import visualize_head, visualize_heads, visualiize_head_mean
+from data_process.LMDHG_Hand import LMDHG_Hand_Dataset
+
 
 from SHREC.Confusion import DrawConfusionMatrix
 
 from data_process.Hand_Dataset import Hand_Dataset
-from model.ST_GCN_AltFormer import ST_GCN_AltFormer
+from model.AltFormer.ST_GCN_AltFormer import ST_GCN_AltFormer
 
 parser = argparse.ArgumentParser()
 

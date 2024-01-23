@@ -1,9 +1,4 @@
-# The based unit of graph convolutional networks.
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
 from .net import conv_init
 import math
 
@@ -12,11 +7,6 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
-'''
-This class implements Adaptive Graph Convolution. 
-Function adapted from "Two-Stream Adaptive Graph Convolutional Networks for Skeleton Action Recognition" of Shi. et al. ("https://github.com/lshiwjx/2s-AGCN")
-
-'''
 
 
 def conv_init(conv):
