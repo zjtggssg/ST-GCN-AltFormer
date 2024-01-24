@@ -20,6 +20,6 @@ This package has the following requirements:
 
 2. Run one of following commands.
 ```
-python SHREC/train_sttran.py       # on SHREC’17 Track Dataset
-python LMDHG/LMDHG_sttran.py         # on LMDHG Dataset
+python SHREC/ST_TS/train_sttran.py       # on SHREC’17 Track Dataset
+python LMDHG/ST_TS/LMDHG_sttran.py         # on LMDHG Dataset
 python 
