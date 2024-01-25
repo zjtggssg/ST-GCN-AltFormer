@@ -22,4 +22,7 @@ This package has the following requirements:
 ```
 python SHREC/ST_TS/train_sttran.py       # on SHREC’17 Track Dataset
 python LMDHG/ST_TS/LMDHG_sttran.py         # on LMDHG Dataset
-python 
+python DHG/ST_TS/DHG_sttran.py        # on DHG Dataset
+
+
+3. if you need weighting parameter(.pth), please concat with me as 873616979@qq.com
