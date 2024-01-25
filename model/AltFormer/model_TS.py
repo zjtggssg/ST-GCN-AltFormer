@@ -8,12 +8,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-from timm.models.helpers import load_pretrained
+
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-from timm.models.registry import register_model
-from visualizer import get_local
-# from zjt.trans.net import conv_init
+
 
 
 class Mlp(nn.Module):
@@ -48,7 +45,7 @@ class Attention(nn.Module):
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
 
-    @get_local('attention_map')
+
     def forward(self, x):
         B, N, C = x.shape
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
@@ -205,9 +202,6 @@ class TS(nn.Module):
         x = self.mlp_head(x)
 
         return x
-
-
-
 
     def forward(self, x):
         x = self.Temporal_forward_features(x)
