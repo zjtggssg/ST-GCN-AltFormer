@@ -70,18 +70,11 @@ def init_model():
     l = [('labeling_mode', 'spatial')]
     graph_args = dict(l)
     address = 'graph.LMDHG'
-    model = ST_GCN_AltFormer(channel=3, num_class=class_num, window_size=300, num_point=46, attention=True,
-                      only_attention=True,
-                      tcn_attention=False, all_layers=False, only_temporal_attention=True, attention_3=False,
-                      relative=False,
-                      double_channel=True,
-                      drop_connect=True, concat_original=True, dv=0.25, dk=0.25, Nh=8, dim_block1=10, dim_block2=30,
-                      dim_block3=75,
-                      data_normalization=True, visualization=False, skip_conn=True, adjacency=False,
-                      kernel_temporal=9, bn_flag=True, weight_matrix=2, more_channels=False, n=4, device=output_device,
-                      graph=address,
-                      graph_args=graph_args
-                      )
+    model = ST_GCN_AltFormer(channel=3, backbone_in_c=128, num_frame=180, num_joints=46, num_class=class_num,
+                             style='TS',
+                             graph=address,
+                             graph_args=graph_args
+                             )
 
     model = torch.nn.DataParallel(model).cuda()
 
@@ -95,7 +88,7 @@ def model_foreward(sample_batched, model, criterion):
     label = label.cuda()
     label = torch.autograd.Variable(label, requires_grad=False)
 
-    score,st,ts = model(data)
+    score = model(data)
 
     loss = criterion(score, label)
 
