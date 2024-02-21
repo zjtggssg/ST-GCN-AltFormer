@@ -6,11 +6,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-from timm.models.helpers import load_pretrained
+
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-from timm.models.registry import register_model
-from visualizer import get_local
+
+
 
 
 
@@ -46,7 +45,7 @@ class Attention(nn.Module):
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
 
-    @get_local('attention_map')
+
     def forward(self, x):
         B, N, C = x.shape
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
@@ -146,7 +145,7 @@ class ST(nn.Module):
         self.fcn = nn.Conv1d(512,  class_num, kernel_size=1)
         # conv_init(self.fcn)
 
-    @get_local('attention_str_map')
+
     def Spatial_forward_features(self, x):
         # print("x.start",x.shape)
         b, _, f, p = x.shape  ##### b is batch size, f is number of frames, p is number of joints
@@ -174,7 +173,7 @@ class ST(nn.Module):
         # print("x.spatial",x.shape)
         return x
 
-    @get_local('attention_ttr_map')
+
     # @get_local('ttr_feature')
     def forward_features(self, x):
         # print("x_start",x.shape)   #32 180 256
@@ -206,7 +205,7 @@ class ST(nn.Module):
 
         return x,ttr_feature
 
-    @get_local('feature')
+
     def forward(self, x):
 
         x = self.Spatial_forward_features(x)
