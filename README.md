@@ -25,4 +25,6 @@ python LMDHG/ST_TS/LMDHG_sttran.py         # on LMDHG Dataset
 python DHG/ST_TS/DHG_sttran.py        # on DHG Dataset
 
 
-3. if you need weighting parameter(.pth), please concat with me as 873616979@qq.com
+3. if you need weighting parameter(.pth), please download from Google Cloud Drive：https://drive.google.com/file/d/1BVXWKuMRgqca4v5DujPjHuCycqfp503D/view?usp=drive_link
+
+4. Finally，run esemble.py or emsemble_LMDHG.py
